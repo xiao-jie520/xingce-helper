@@ -1,0 +1,8 @@
+* text=auto eol=lf
+
+# 保持脚本在 macOS/Linux 可执行
+gradlew text eol=lf
+*.bat text eol=crlf
+*.jar binary
+*.png binary
+*.apk binary
