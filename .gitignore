@@ -28,5 +28,6 @@ local.properties
 # 工具与临时文件
 .workbuddy/
 screenshots/
+icon-work/
 .DS_Store
 Thumbs.db

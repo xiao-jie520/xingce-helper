@@ -103,7 +103,8 @@ fun SectionBarRow(
     modifier: Modifier = Modifier,
     delayMillis: Int = 0,
     highlight: Boolean = false,
-    trailingText: String? = null
+    trailingText: String? = null,
+    countText: String? = null
 ) {
     val p = LocalFluent.current
     val color = accuracyColor(section.accuracy)
@@ -127,7 +128,7 @@ fun SectionBarRow(
                 )
             }
             Text(
-                text = "${section.correct}/${section.total}",
+                text = countText ?: "${section.correct}/${section.total}",
                 color = p.textTertiary,
                 fontSize = 11.5.sp
             )

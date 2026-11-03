@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -97,6 +98,12 @@ fun ReportScreen(
     val sectionHistory = remember(record.id, all.size) { Analyzer.sectionHistory(record, all) }
     val chronological = remember(record.id, all.size) { Analyzer.overallTrend(all) }
     val trendShown = chronological.takeLast(10)
+    val others = remember(record.id, all.size) { all.filter { it.id != record.id } }
+    val overallAverage = remember(record.id, all.size) {
+        if (others.isEmpty()) null else others.map { it.accuracy }.average().toFloat()
+    }
+    val lastOverallDelta = previous?.let { record.accuracy - it.accuracy }
+    val avgOverallDelta = overallAverage?.let { record.accuracy - it }
 
     Column(
         modifier = modifier
@@ -262,37 +269,83 @@ fun ReportScreen(
                         VerticalRule(height = 30.dp)
                         MiniStat("用时", "${record.durationMinutes}′", p.textPrimary, Modifier.weight(1f))
                     }
-                    if (previous != null) {
-                        VerticalRule(height = 30.dp)
-                        val delta = record.accuracy - previous.accuracy
-                        MiniStat(
-                            label = "较上次",
-                            value = Fmt.signedPercent(delta, 0),
-                            color = if (delta >= 0) p.success else p.danger,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
                 }
             }
         }
 
         Spacer(Modifier.height(12.dp))
 
-        Reveal(140) {
+        Reveal(110) {
             AcrylicCard(modifier = Modifier.fillMaxWidth()) {
                 SectionTitle(
                     title = "板块拆解",
-                    subtitle = "板块右侧为与历史平均的差值"
+                    subtitle = "各板块正确率与题量"
                 )
                 Spacer(Modifier.height(8.dp))
                 record.answeredSections.forEachIndexed { index, section ->
-                    val historyAvg = sectionHistory[section.name]
-                    val deltaText = historyAvg?.let { Fmt.signedPercent(section.accuracy - it, 0) }
                     SectionBarRow(
                         section = section,
                         delayMillis = 100 + index * 70,
-                        highlight = section == record.answeredSections.minByOrNull { it.accuracy },
-                        trailingText = deltaText
+                        highlight = section == record.answeredSections.minByOrNull { it.accuracy }
+                    )
+                }
+            }
+        }
+
+        if (lastOverallDelta != null || avgOverallDelta != null) {
+            Spacer(Modifier.height(12.dp))
+            Reveal(160) {
+                AcrylicCard(modifier = Modifier.fillMaxWidth()) {
+                    SectionTitle(
+                        title = "本次对比",
+                        subtitle = "相对上一次 / 历史平均"
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            text = "较上次",
+                            modifier = Modifier.width(64.dp),
+                            color = p.textTertiary,
+                            fontSize = 9.5.sp,
+                            textAlign = TextAlign.End
+                        )
+                        Text(
+                            text = "较平均",
+                            modifier = Modifier.width(64.dp),
+                            color = p.textTertiary,
+                            fontSize = 9.5.sp,
+                            textAlign = TextAlign.End
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    ComparisonRow("总正确率", lastOverallDelta, avgOverallDelta, strong = true)
+                    Spacer(Modifier.height(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(p.divider)
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    record.answeredSections.forEach { section ->
+                        val lastSection = previous?.sections
+                            ?.firstOrNull { it.name == section.name && it.total > 0 }
+                            ?.accuracy
+                        val avgSection = sectionHistory[section.name]
+                        ComparisonRow(
+                            name = section.name,
+                            lastDelta = lastSection?.let { section.accuracy - it },
+                            avgDelta = avgSection?.let { section.accuracy - it }
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "较上次 = 与上一次模考同一指标的差值；较平均 = 与之前所有记录平均值的差值。单位为百分点，" +
+                            "没记录到的板块显示为「—」。",
+                        color = p.textTertiary,
+                        fontSize = 10.sp,
+                        lineHeight = 15.sp
                     )
                 }
             }
@@ -375,6 +428,60 @@ fun ReportScreen(
             onDismiss = { confirmDelete = false }
         )
     }
+}
+
+@Composable
+private fun ComparisonRow(
+    name: String,
+    lastDelta: Float?,
+    avgDelta: Float?,
+    strong: Boolean = false
+) {
+    val p = LocalFluent.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = name,
+            modifier = Modifier.weight(1f),
+            color = if (strong) p.textPrimary else p.textSecondary,
+            fontSize = if (strong) 13.sp else 12.5.sp,
+            fontWeight = if (strong) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        DeltaCell(lastDelta, Modifier.width(64.dp), strong)
+        DeltaCell(avgDelta, Modifier.width(64.dp), strong)
+    }
+}
+
+@Composable
+private fun DeltaCell(value: Float?, modifier: Modifier, strong: Boolean = false) {
+    val p = LocalFluent.current
+    val nearZero = value != null && kotlin.math.abs(value) < 0.005f
+    val text = when {
+        value == null -> "—"
+        nearZero -> "±0"
+        else -> Fmt.signedPercent(value, 1)
+    }
+    val color = when {
+        value == null -> p.textTertiary.copy(alpha = 0.55f)
+        nearZero -> p.textTertiary
+        value > 0 -> p.success
+        else -> p.danger
+    }
+    Text(
+        text = text,
+        modifier = modifier,
+        color = color,
+        fontSize = if (strong) 13.sp else 12.sp,
+        fontWeight = if (strong) FontWeight.SemiBold else FontWeight.Medium,
+        textAlign = TextAlign.End,
+        maxLines = 1
+    )
 }
 
 @Composable

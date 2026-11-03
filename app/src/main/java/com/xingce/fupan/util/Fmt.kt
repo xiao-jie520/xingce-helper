@@ -56,6 +56,12 @@ object Fmt {
         return if (v >= 0) "+$s%" else "$s%"
     }
 
+    /** 一位小数 */
+    fun num1(value: Float): String = String.format(Locale.CHINA, "%.1f", value)
+
+    /** 取整字符串 */
+    fun num0(value: Float): String = "${value.roundToInt()}"
+
     fun duration(minutes: Int?): String = when {
         minutes == null || minutes <= 0 -> "未记录用时"
         minutes >= 60 -> "${minutes / 60} 小时${if (minutes % 60 == 0) "" else " ${minutes % 60} 分"}"

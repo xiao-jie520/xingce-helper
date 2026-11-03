@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
@@ -61,6 +62,7 @@ fun HistoryScreen(
     onOpen: (String) -> Unit,
     onEdit: (String) -> Unit,
     onDelete: (String) -> Unit,
+    onOpenAnalysis: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val p = LocalFluent.current
@@ -86,6 +88,55 @@ fun HistoryScreen(
                 subtitle = "共 ${records.size} 次记录",
                 onBack = onBack
             )
+
+            Spacer(Modifier.height(12.dp))
+
+            AcrylicCard(
+                modifier = Modifier.fillMaxWidth(),
+                corner = 20.dp,
+                padding = PaddingValues(14.dp),
+                onClick = onOpenAnalysis
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(13.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(
+                                        p.accent.copy(alpha = 0.14f),
+                                        p.accentLight.copy(alpha = 0.10f)
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.BarChart,
+                            contentDescription = null,
+                            tint = p.accent,
+                            modifier = Modifier.size(19.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(11.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "综合分析",
+                            color = p.textPrimary,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "按时间范围统计各模块平均成绩",
+                            color = p.textTertiary,
+                            fontSize = 10.5.sp,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
+                    Text(text = "›", color = p.accent, fontSize = 18.sp)
+                }
+            }
         }
 
         Spacer(Modifier.height(14.dp))

@@ -24,6 +24,7 @@ import com.xingce.fupan.data.PaperRecord
 import com.xingce.fupan.data.RecordStore
 import com.xingce.fupan.ui.components.FluentBackground
 import com.xingce.fupan.ui.screens.AddRecordScreen
+import com.xingce.fupan.ui.screens.AnalysisScreen
 import com.xingce.fupan.ui.screens.HistoryScreen
 import com.xingce.fupan.ui.screens.HomeScreen
 import com.xingce.fupan.ui.screens.ReportScreen
@@ -39,6 +40,10 @@ sealed interface Screen {
 
     data object History : Screen {
         override val depth: Int get() = 1
+    }
+
+    data object Analysis : Screen {
+        override val depth: Int get() = 2
     }
 
     data class Add(val editId: String? = null) : Screen {
@@ -94,12 +99,18 @@ fun AppRoot(records: List<PaperRecord>) {
                     onOpenReport = { id -> push(Screen.Report(id)) }
                 )
 
+                is Screen.Analysis -> AnalysisScreen(
+                    records = records,
+                    onBack = pop
+                )
+
                 is Screen.History -> HistoryScreen(
                     records = records,
                     onBack = pop,
                     onOpen = { id -> push(Screen.Report(id)) },
                     onEdit = { id -> push(Screen.Add(id)) },
-                    onDelete = { id -> RecordStore.delete(id) }
+                    onDelete = { id -> RecordStore.delete(id) },
+                    onOpenAnalysis = { push(Screen.Analysis) }
                 )
 
                 is Screen.Add -> AddRecordScreen(

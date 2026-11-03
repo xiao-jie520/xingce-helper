@@ -180,6 +180,82 @@ object Analyzer {
         else -> Tone.BAD
     }
 
+    /** 区间汇总诊断：短板、最强项、与上一区间对比、稳定性 */
+    fun aggregateInsights(agg: Aggregate, previous: Aggregate? = null): List<Insight> {
+        if (agg.records.isEmpty() || agg.modules.isEmpty()) {
+            return listOf(
+                Insight("还没有可分析的数据", "先在所选范围里记录一次模考，这里会给出模块平均与诊断。", Tone.INFO)
+            )
+        }
+        val out = ArrayList<Insight>()
+        val mods = agg.modules.filter { it.totalQuestions > 0 }
+
+        if (mods.size >= 2) {
+            val weakest = mods.minByOrNull { it.accuracy }!!
+            val strongest = mods.maxByOrNull { it.accuracy }!!
+            val others = mods.filter { it.name != weakest.name }
+            val othersAvg = others.map { it.accuracy }.average().toFloat()
+
+            if (othersAvg > weakest.accuracy) {
+                val lose = ((othersAvg - weakest.accuracy) * weakest.avgTotal).roundToInt().coerceAtLeast(1)
+                out += Insight(
+                    title = "短板 · ${weakest.name}",
+                    detail = "这 ${agg.exams} 场平均 ${Fmt.percent(weakest.accuracy)}" +
+                        "（场均对 ${Fmt.num1(weakest.avgCorrect)}/${Fmt.num0(weakest.avgTotal)} 题），" +
+                        "比其余模块均值 ${Fmt.percent(othersAvg)} 低 ${Fmt.percent(othersAvg - weakest.accuracy)}。" +
+                        "按题量折算，每场在这方面大约丢 $lose 题。",
+                    tone = toneOf(weakest.accuracy),
+                    badge = "场均丢 $lose 题"
+                )
+            }
+
+            out += Insight(
+                title = "最强项 · ${strongest.name}",
+                detail = "平均 ${Fmt.percent(strongest.accuracy)}，是这段区间里最稳的得分板块，" +
+                    "考试时可以放在状态最好的时段先做，先把节奏带起来。",
+                tone = Tone.GOOD,
+                badge = Fmt.percent(strongest.accuracy, 0)
+            )
+        }
+
+        if (previous != null && previous.exams > 0) {
+            val delta = agg.accuracy - previous.accuracy
+            val up = delta > 0
+            out += Insight(
+                title = if (kotlin.math.abs(delta) < 0.01f) "与上一区间持平" else if (up) "较上一区间提升" else "较上一区间回落",
+                detail = "本区间加权 ${Fmt.percent(agg.accuracy)}，上一区间（${previous.exams} 场）${Fmt.percent(previous.accuracy)}，" +
+                    "相差 ${Fmt.percent(kotlin.math.abs(delta))}。",
+                tone = if (kotlin.math.abs(delta) < 0.01f) Tone.INFO else if (up) Tone.GOOD else Tone.WARN,
+                badge = Fmt.signedPercent(delta, 0)
+            )
+        }
+
+        if (agg.exams >= 3) {
+            val best = agg.best?.accuracy ?: 0f
+            val worst = agg.worst?.accuracy ?: 0f
+            val gap = best - worst
+            val sd = agg.spread
+            if (gap >= 0.08f) {
+                out += Insight(
+                    title = "发挥不太稳定",
+                    detail = "区间内最高 ${Fmt.percent(best)}、最低 ${Fmt.percent(worst)}，相差 ${Fmt.percent(gap)}。" +
+                        "波动大的时候先固定做题顺序和时间分配，比继续刷题更有效。",
+                    tone = Tone.WARN,
+                    badge = "±${Fmt.num1(sd * 100f)}"
+                )
+            } else {
+                out += Insight(
+                    title = "发挥比较稳定",
+                    detail = "最高与最低只差 ${Fmt.percent(gap)}，说明分数不是靠运气，可以开始抠细节、压缩单题耗时。",
+                    tone = Tone.GOOD,
+                    badge = "±${Fmt.num1(sd * 100f)}"
+                )
+            }
+        }
+
+        return out.take(4)
+    }
+
     /** 分享文本 */
     fun shareText(record: PaperRecord, all: List<PaperRecord>): String {
         val sb = StringBuilder()

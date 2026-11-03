@@ -7,8 +7,10 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,10 +45,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -54,11 +59,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.xingce.fupan.data.Aggregate
+import com.xingce.fupan.data.Aggregator
 import com.xingce.fupan.data.Analyzer
 import com.xingce.fupan.data.PaperRecord
+import com.xingce.fupan.data.SectionResult
 import com.xingce.fupan.ui.components.AboutDialog
 import com.xingce.fupan.ui.components.AcrylicCard
-import com.xingce.fupan.ui.components.AcrylicIconButton
 import com.xingce.fupan.ui.components.EmptyStateCard
 import com.xingce.fupan.ui.components.InsightRow
 import com.xingce.fupan.ui.components.PillChip
@@ -68,10 +75,11 @@ import com.xingce.fupan.ui.components.SectionBarRow
 import com.xingce.fupan.ui.components.SectionTitle
 import com.xingce.fupan.ui.components.StatTile
 import com.xingce.fupan.ui.components.TrendChart
-import com.xingce.fupan.ui.components.accentGradient
 import com.xingce.fupan.ui.theme.LocalFluent
 import com.xingce.fupan.util.Fmt
 import kotlin.math.abs
+
+private const val RECENT_WINDOW = 5
 
 @Composable
 fun HomeScreen(
@@ -83,13 +91,15 @@ fun HomeScreen(
 ) {
     val p = LocalFluent.current
     val latest = records.firstOrNull()
-    val previous = remember(latest?.id, records.size) {
-        latest?.let { Analyzer.previousOf(it, records) }
+    val recent = remember(records) { Aggregator.of(records.take(RECENT_WINDOW)) }
+    val previousRange = remember(records) {
+        val prev = records.drop(RECENT_WINDOW).take(RECENT_WINDOW)
+        if (prev.isEmpty()) null else Aggregator.of(prev)
     }
-    val insights = remember(latest?.id, records.size) {
-        latest?.let { Analyzer.insights(it, records) }.orEmpty()
+    val insights = remember(records) {
+        if (records.isEmpty()) emptyList() else Analyzer.aggregateInsights(recent, previousRange)
     }
-    val chronological = remember(records.size) { Analyzer.overallTrend(records) }
+    val chronological = remember(records) { Analyzer.overallTrend(records) }
 
     val scroll = rememberScrollState()
     var showAbout by remember { mutableStateOf(false) }
@@ -100,9 +110,9 @@ fun HomeScreen(
         }.getOrNull() ?: "1.0.0"
     }
     var started by remember { mutableStateOf(false) }
-    LaunchedEffect(latest?.id) { started = true }
+    LaunchedEffect(records) { started = true }
     val accAnim by animateFloatAsState(
-        targetValue = if (started) (latest?.accuracy ?: 0f) else 0f,
+        targetValue = if (started) recent.accuracy else 0f,
         animationSpec = tween(1200, easing = FastOutSlowInEasing),
         label = "heroAcc"
     )
@@ -132,17 +142,16 @@ fun HomeScreen(
                         letterSpacing = (-0.5).sp
                     )
                     Text(
-                        text = if (records.isEmpty()) "把每一套卷子都变成经验" else "共 ${records.size} 次模考 · 最近更新 ${Fmt.dateShort(latest!!.dateMillis)}",
+                        text = if (latest == null) {
+                            "把每一套卷子都变成经验"
+                        } else {
+                            "共 ${records.size} 次模考 · 最近更新 ${Fmt.dateShort(latest.dateMillis)}"
+                        },
                         color = p.textTertiary,
                         fontSize = 11.5.sp,
                         modifier = Modifier.padding(top = 3.dp)
                     )
                 }
-                AcrylicIconButton(
-                    icon = Icons.Rounded.History,
-                    onClick = onOpenHistory,
-                    contentDescription = "历史试卷"
-                )
             }
 
             Spacer(Modifier.height(18.dp))
@@ -178,11 +187,10 @@ fun HomeScreen(
                 }
             } else {
                 Reveal(0) {
-                    HeroCard(
-                        record = latest,
-                        previous = previous,
+                    AggregateHeroCard(
+                        aggregate = recent,
+                        previous = previousRange,
                         animatedAccuracy = accAnim,
-                        index = records.size,
                         onClick = { onOpenReport(latest.id) }
                     )
                 }
@@ -192,7 +200,7 @@ fun HomeScreen(
                 Reveal(70) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         val best = records.maxByOrNull { it.accuracy }
-                        val avg = records.map { it.accuracy }.average().toFloat()
+                        val allAvg = records.map { it.accuracy }.average().toFloat()
                         StatTile(
                             label = "历史最高",
                             value = best?.let { Fmt.percent(it.accuracy) } ?: "—",
@@ -201,9 +209,9 @@ fun HomeScreen(
                             modifier = Modifier.weight(1f)
                         )
                         StatTile(
-                            label = "平均正确率",
-                            value = Fmt.percent(avg),
-                            caption = "近 ${records.size} 次",
+                            label = "全部平均",
+                            value = Fmt.percent(allAvg),
+                            caption = "共 ${records.size} 次",
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -212,20 +220,7 @@ fun HomeScreen(
                 Spacer(Modifier.height(12.dp))
 
                 Reveal(140) {
-                    AcrylicCard(modifier = Modifier.fillMaxWidth()) {
-                        SectionTitle(
-                            title = "板块表现",
-                            subtitle = "最近一次 · ${Fmt.dateFull(latest.dateMillis)}"
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        latest.answeredSections.forEachIndexed { index, section ->
-                            SectionBarRow(
-                                section = section,
-                                delayMillis = 120 + index * 70,
-                                highlight = section == latest.answeredSections.minByOrNull { it.accuracy }
-                            )
-                        }
-                    }
+                    ModuleAverageCard(aggregate = recent)
                 }
 
                 if (chronological.size >= 1) {
@@ -251,7 +246,10 @@ fun HomeScreen(
 
                 Reveal(260) {
                     AcrylicCard(modifier = Modifier.fillMaxWidth()) {
-                        SectionTitle(title = "薄弱诊断", subtitle = "自动对比历史记录")
+                        SectionTitle(
+                            title = "区间诊断",
+                            subtitle = "近 ${recent.exams} 次的整体表现"
+                        )
                         Spacer(Modifier.height(6.dp))
                         insights.take(2).forEach { InsightRow(it) }
                         Spacer(Modifier.height(4.dp))
@@ -260,14 +258,14 @@ fun HomeScreen(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
                                 .clickable(
-                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                    interactionSource = remember { MutableInteractionSource() },
                                     indication = LocalIndication.current
                                 ) { onOpenReport(latest.id) }
                                 .padding(vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "查看完整成绩报告",
+                                text = "查看最近一次成绩报告",
                                 color = p.accent,
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.SemiBold,
@@ -302,13 +300,25 @@ fun HomeScreen(
             Spacer(Modifier.height(118.dp))
         }
 
-        FloatingAddButton(
-            onClick = onAdd,
+        Row(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .navigationBarsPadding()
-                .padding(end = 22.dp, bottom = 24.dp)
-        )
+                .padding(end = 22.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            GlassFabButton(
+                icon = Icons.Rounded.Add,
+                contentDescription = "添加试卷记录",
+                onClick = onAdd
+            )
+            Spacer(Modifier.width(12.dp))
+            GlassFabButton(
+                icon = Icons.Rounded.History,
+                contentDescription = "历史试卷",
+                onClick = onOpenHistory
+            )
+        }
 
         if (showAbout) {
             AboutDialog(versionName = versionName, onDismiss = { showAbout = false })
@@ -317,15 +327,16 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HeroCard(
-    record: PaperRecord,
-    previous: PaperRecord?,
+private fun AggregateHeroCard(
+    aggregate: Aggregate,
+    previous: Aggregate?,
     animatedAccuracy: Float,
-    index: Int,
     onClick: () -> Unit
 ) {
     val p = LocalFluent.current
-    val delta = previous?.let { record.accuracy - it.accuracy }
+    val delta = previous?.let { aggregate.accuracy - it.accuracy }
+    val rangeLabel = if (aggregate.exams == 1) "最近一次" else "近 ${aggregate.exams} 次"
+
     AcrylicCard(
         modifier = Modifier.fillMaxWidth(),
         strong = true,
@@ -334,7 +345,7 @@ private fun HeroCard(
         onClick = onClick
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            PillChip(text = "最近一次")
+            PillChip(text = rangeLabel)
             Spacer(Modifier.width(8.dp))
             if (delta != null && abs(delta) >= 0.005f) {
                 val up = delta > 0
@@ -362,11 +373,15 @@ private fun HeroCard(
                 }
             }
             Spacer(Modifier.weight(1f))
-            Text(
-                text = "第 $index 次",
-                color = p.textTertiary,
-                fontSize = 10.5.sp
-            )
+            val start = aggregate.startDate
+            val end = aggregate.endDate
+            if (start != null && end != null) {
+                Text(
+                    text = "${Fmt.dateDot(start)} – ${Fmt.dateDot(end)}",
+                    color = p.textTertiary,
+                    fontSize = 10.5.sp
+                )
+            }
         }
 
         Spacer(Modifier.height(12.dp))
@@ -374,43 +389,29 @@ private fun HeroCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = record.name,
+                    text = if (aggregate.exams == 1) "最近一次成绩" else "近 ${aggregate.exams} 次平均",
                     color = p.textPrimary,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 4.dp)
-                ) {
-                    Text(
-                        text = record.templateLabel,
-                        color = p.textTertiary,
-                        fontSize = 10.5.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(text = " · ", color = p.textTertiary, fontSize = 10.5.sp)
-                    Text(
-                        text = Fmt.dateShort(record.dateMillis),
-                        color = p.textTertiary,
-                        fontSize = 10.5.sp
-                    )
-                }
-                Spacer(Modifier.height(14.dp))
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        text = Fmt.percent(animatedAccuracy),
-                        color = p.textPrimary,
-                        fontSize = 42.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = (-1.4).sp
-                    )
-                }
                 Text(
-                    text = "总正确率 · 答对 ${record.totalCorrect} / 错 ${record.totalWrong}",
+                    text = "按题量加权的总正确率",
+                    color = p.textTertiary,
+                    fontSize = 10.5.sp,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    text = Fmt.percent(animatedAccuracy),
+                    color = p.textPrimary,
+                    fontSize = 42.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-1.4).sp
+                )
+                Text(
+                    text = "场均答对 ${Fmt.num1(aggregate.avgCorrect)} / ${Fmt.num0(aggregate.avgQuestions)} 题",
                     color = p.textSecondary,
                     fontSize = 11.5.sp,
                     modifier = Modifier.padding(top = 2.dp)
@@ -418,20 +419,20 @@ private fun HeroCard(
             }
             Spacer(Modifier.width(10.dp))
             ProgressRing(
-                progress = record.accuracy,
+                progress = aggregate.accuracy,
                 modifier = Modifier.size(98.dp),
                 strokeWidth = 9.dp
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "${record.totalCorrect}",
+                        text = Fmt.num0(aggregate.avgCorrect),
                         color = p.textPrimary,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = (-0.5).sp
                     )
                     Text(
-                        text = "/ ${record.totalQuestions} 题",
+                        text = "/ ${Fmt.num0(aggregate.avgQuestions)} 题",
                         color = p.textTertiary,
                         fontSize = 9.5.sp
                     )
@@ -442,59 +443,125 @@ private fun HeroCard(
 }
 
 @Composable
-private fun FloatingAddButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+private fun ModuleAverageCard(
+    aggregate: Aggregate
+) {
+    val p = LocalFluent.current
+    val weakest = aggregate.modules.minByOrNull { it.accuracy }
+
+    AcrylicCard(modifier = Modifier.fillMaxWidth()) {
+        SectionTitle(
+            title = "各模块平均",
+            subtitle = if (aggregate.exams == 1) "最近一次 · 按题量加权" else "近 ${aggregate.exams} 次 · 按题量加权"
+        )
+        Spacer(Modifier.height(8.dp))
+        aggregate.modules.forEachIndexed { index, module ->
+            SectionBarRow(
+                section = SectionResult(module.name, module.totalQuestions, module.totalCorrect),
+                delayMillis = 120 + index * 70,
+                highlight = module.name == weakest?.name,
+                countText = "场均 ${Fmt.num1(module.avgCorrect)}/${Fmt.num0(module.avgTotal)}"
+            )
+        }
+    }
+}
+
+@Composable
+private fun GlassFabButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit
 ) {
     val p = LocalFluent.current
     val haptic = LocalHapticFeedback.current
     var ready by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { ready = true }
+    val noise = remember { buildFrostNoise() }
     val scaleAnim by animateFloatAsState(
         targetValue = if (ready) 1f else 0f,
         animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow),
         label = "fabIn"
     )
 
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Box(
-            modifier = Modifier
-                .size(74.dp)
-                .background(
-                    Brush.radialGradient(
-                        listOf(p.accent.copy(alpha = 0.22f), Color.Transparent)
-                    ),
-                    CircleShape
-                )
-        )
-        Box(
-            modifier = Modifier
-                .scale(scaleAnim)
-                .size(60.dp)
-                .shadow(
-                    elevation = 16.dp,
-                    shape = CircleShape,
-                    clip = false,
-                    ambientColor = p.accent.copy(alpha = 0.45f),
-                    spotColor = p.accent.copy(alpha = 0.55f)
-                )
-                .clip(CircleShape)
-                .background(accentGradient())
-                .clickable(
-                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                    indication = LocalIndication.current
-                ) {
-                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                    onClick()
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Add,
-                contentDescription = "添加试卷记录",
-                tint = Color.White,
-                modifier = Modifier.size(28.dp)
+    Box(
+        modifier = Modifier
+            .scale(scaleAnim)
+            .size(56.dp)
+            .shadow(
+                elevation = 14.dp,
+                shape = CircleShape,
+                clip = false,
+                ambientColor = p.shadow.copy(alpha = 0.18f),
+                spotColor = p.shadow.copy(alpha = 0.26f)
             )
-        }
+            .clip(CircleShape)
+            .background(Brush.verticalGradient(listOf(p.glassTop, p.glassBottom)))
+            .drawBehind {
+                // 磨砂颗粒
+                drawRect(brush = noise, alpha = if (p.dark) 1f else 0.7f)
+                // 玻璃高光：偏左上的一点漫反射
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = if (p.dark) 0.20f else 0.50f),
+                            Color.Transparent
+                        ),
+                        center = Offset(size.width * 0.30f, size.height * 0.20f),
+                        radius = size.minDimension * 0.85f
+                    )
+                )
+            }
+            .border(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    listOf(
+                        Color.White.copy(alpha = if (p.dark) 0.26f else 0.98f),
+                        Color.White.copy(alpha = if (p.dark) 0.05f else 0.50f)
+                    )
+                ),
+                shape = CircleShape
+            )
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = LocalIndication.current
+            ) {
+                haptic.performHapticFeedback(
+                    androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress
+                )
+                onClick()
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = p.accent,
+            modifier = Modifier.size(24.dp)
+        )
     }
+}
+
+/** 生成一小块磨砂颗粒纹理，平铺使用 */
+private fun buildFrostNoise(): Brush {
+    val size = 96
+    val bitmap = android.graphics.Bitmap.createBitmap(
+        size,
+        size,
+        android.graphics.Bitmap.Config.ARGB_8888
+    )
+    val random = java.util.Random(11L)
+    val pixels = IntArray(size * size)
+    for (i in pixels.indices) {
+        val alpha = random.nextInt(22) + 3
+        val lum = if (random.nextBoolean()) 255 else 0
+        pixels[i] = (alpha shl 24) or (lum shl 16) or (lum shl 8) or lum
+    }
+    bitmap.setPixels(pixels, 0, size, 0, 0, size, size)
+    return ShaderBrush(
+        android.graphics.BitmapShader(
+            bitmap,
+            android.graphics.Shader.TileMode.REPEAT,
+            android.graphics.Shader.TileMode.REPEAT
+        )
+    )
 }
