@@ -28,6 +28,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
@@ -76,6 +77,7 @@ import com.xingce.fupan.ui.components.SegmentedToggle
 import com.xingce.fupan.ui.components.accuracyColor
 import com.xingce.fupan.ui.theme.LocalFluent
 import com.xingce.fupan.util.Fmt
+import top.yukonga.miuix.kmp.basic.TextField as MiuixTextField
 import java.time.LocalDate
 import java.util.UUID
 
@@ -223,46 +225,25 @@ fun AddRecordScreen(
                 SectionTitle(title = "基本信息")
                 Spacer(Modifier.height(12.dp))
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(p.track)
-                        .border(1.dp, p.strokeBottom.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
-                        .padding(horizontal = 14.dp, vertical = 10.dp)
-                ) {
-                    Column {
-                        Text(text = "试卷名称", color = p.textTertiary, fontSize = 9.5.sp)
-                        BasicTextField(
-                            value = name,
-                            onValueChange = {
-                                name = it.take(40)
-                                nameEdited = true
-                            },
-                            textStyle = TextStyle(
-                                fontSize = 14.5.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = if (nameOk) p.textPrimary else p.danger
-                            ),
-                            singleLine = true,
-                            cursorBrush = SolidColor(p.accent),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                            modifier = Modifier.fillMaxWidth(),
-                            decorationBox = { inner ->
-                                Box {
-                                    if (name.isEmpty()) {
-                                        Text(
-                                            text = "例如：行政执法模考 第 3 套",
-                                            color = p.textTertiary.copy(alpha = 0.7f),
-                                            fontSize = 14.sp
-                                        )
-                                    }
-                                    inner()
-                                }
-                            }
-                        )
-                    }
-                }
+                MiuixTextField(
+                    value = name,
+                    onValueChange = {
+                        name = it.take(40)
+                        nameEdited = true
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    cornerRadius = 14.dp,
+                    label = "试卷名称",
+                    useLabelAsPlaceholder = true,
+                    singleLine = true,
+                    textStyle = TextStyle(
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (nameOk) p.textPrimary else p.danger
+                    ),
+                    borderColor = if (nameOk) p.strokeBottom.copy(alpha = 0.55f) else p.danger,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+                )
 
                 Spacer(Modifier.height(10.dp))
 
@@ -296,39 +277,34 @@ fun AddRecordScreen(
                         }
                     }
                     Spacer(Modifier.width(10.dp))
-                    Column(
+                    MiuixTextField(
+                        value = durationText,
+                        onValueChange = { v -> durationText = v.filter { it.isDigit() }.take(3) },
                         modifier = Modifier
-                            .width(104.dp)
-                            .height(52.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(p.track)
-                            .border(1.dp, p.strokeBottom.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
-                            .padding(horizontal = 12.dp),
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text(text = "用时（分钟）", color = p.textTertiary, fontSize = 9.5.sp)
-                        BasicTextField(
-                            value = durationText,
-                            onValueChange = { v -> durationText = v.filter { it.isDigit() }.take(3) },
-                            textStyle = TextStyle(
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = p.textPrimary
-                            ),
-                            singleLine = true,
-                            cursorBrush = SolidColor(p.accent),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                            modifier = Modifier.fillMaxWidth(),
-                            decorationBox = { inner ->
-                                Box {
-                                    if (durationText.isEmpty()) {
-                                        Text(text = "可选", color = p.textTertiary.copy(alpha = 0.7f), fontSize = 13.sp)
-                                    }
-                                    inner()
-                                }
-                            }
+                            .width(132.dp)
+                            .height(46.dp),
+                        insideMargin = DpSize(10.dp, 6.dp),
+                        cornerRadius = 14.dp,
+                        label = "用时",
+                        useLabelAsPlaceholder = true,
+                        singleLine = true,
+                        borderColor = p.strokeBottom.copy(alpha = 0.55f),
+                        textStyle = TextStyle(
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        ),
+                        trailingIcon = {
+                            Text(
+                                text = "分钟",
+                                color = p.textTertiary,
+                                fontSize = 10.sp
+                            )
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                            imeAction = ImeAction.Done
                         )
-                    }
+                    )
                 }
             }
 
@@ -622,17 +598,11 @@ private fun TemplateCard(
             .height(122.dp)
             .clip(shape)
             .background(
-                if (selected) {
-                    Brush.linearGradient(
-                        listOf(p.accent.copy(alpha = 0.10f), p.accentLight.copy(alpha = 0.06f))
-                    )
-                } else {
-                    Brush.verticalGradient(listOf(p.acrylic, p.acrylicSoft))
-                }
+                if (selected) p.accent.copy(alpha = 0.10f) else p.acrylic
             )
             .border(
                 width = if (selected) 1.5.dp else 1.dp,
-                color = if (selected) p.accent else p.strokeBottom.copy(alpha = 0.6f),
+                color = if (selected) p.accent else p.strokeBottom,
                 shape = shape
             )
             .clickable(
@@ -646,7 +616,8 @@ private fun TemplateCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 PillChip(
                     text = template.category,
-                    selected = selected
+                    selected = false,
+                    tint = if (selected) p.accent else null
                 )
                 Spacer(Modifier.weight(1f))
                 Icon(
@@ -690,20 +661,18 @@ private fun NumberInput(
 ) {
     val p = LocalFluent.current
     val shape = RoundedCornerShape(11.dp)
+    // 数字框用自绘实现：miuix TextField 的占位符写死左对齐，会和居中的数字打架
     Box(
         modifier = modifier
             .height(40.dp)
             .clip(shape)
-            .background(
-                if (emphasized && !isError) p.accent.copy(alpha = 0.08f)
-                else p.track
-            )
+            .background(if (emphasized && !isError) p.accent.copy(alpha = 0.08f) else p.track)
             .border(
                 1.dp,
                 when {
                     isError -> p.danger
                     emphasized -> p.accent.copy(alpha = 0.35f)
-                    else -> p.strokeBottom.copy(alpha = 0.5f)
+                    else -> Color.Transparent
                 },
                 shape
             )
@@ -746,35 +715,22 @@ private fun NameInput(
     onValueChange: (String) -> Unit
 ) {
     val p = LocalFluent.current
-    Box(
+    MiuixTextField(
+        value = value,
+        onValueChange = onValueChange,
         modifier = Modifier
             .padding(end = 4.dp)
-            .height(40.dp)
-            .clip(RoundedCornerShape(11.dp))
-            .background(p.track)
-            .padding(horizontal = 10.dp),
-        contentAlignment = Alignment.CenterStart
-    ) {
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
-            textStyle = TextStyle(
-                fontSize = 12.5.sp,
-                fontWeight = FontWeight.Medium,
-                color = p.textPrimary
-            ),
-            singleLine = true,
-            cursorBrush = SolidColor(p.accent),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-            decorationBox = { inner ->
-                Box {
-                    if (value.isEmpty()) {
-                        Text(text = "板块名", color = p.textTertiary, fontSize = 12.sp)
-                    }
-                    inner()
-                }
-            }
-        )
-    }
+            .height(40.dp),
+        insideMargin = DpSize(10.dp, 6.dp),
+        cornerRadius = 11.dp,
+        label = "板块名",
+        useLabelAsPlaceholder = true,
+        borderColor = p.strokeBottom.copy(alpha = 0.5f),
+        singleLine = true,
+        textStyle = TextStyle(
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.Medium
+        ),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+    )
 }

@@ -24,8 +24,6 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Share
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,10 +48,13 @@ import com.xingce.fupan.ui.components.AcrylicCard
 import com.xingce.fupan.ui.components.AcrylicIconButton
 import com.xingce.fupan.ui.components.ConfirmDialog
 import com.xingce.fupan.ui.components.GradientButton
+import com.xingce.fupan.ui.components.GroupLabel
 import com.xingce.fupan.ui.components.InsightRow
 import com.xingce.fupan.ui.components.PillChip
+import com.xingce.fupan.ui.components.PopupActionItem
 import com.xingce.fupan.ui.components.ProgressRing
 import com.xingce.fupan.ui.components.Reveal
+import com.xingce.fupan.ui.components.RowDivider
 import com.xingce.fupan.ui.components.ScreenTopBar
 import com.xingce.fupan.ui.components.SectionBarRow
 import com.xingce.fupan.ui.components.SectionTitle
@@ -62,6 +63,8 @@ import com.xingce.fupan.ui.components.VerticalRule
 import com.xingce.fupan.ui.components.toneColor
 import com.xingce.fupan.ui.theme.LocalFluent
 import com.xingce.fupan.util.Fmt
+import top.yukonga.miuix.kmp.basic.ListPopup
+import top.yukonga.miuix.kmp.basic.ListPopupColumn
 
 @Composable
 fun ReportScreen(
@@ -75,7 +78,7 @@ fun ReportScreen(
 ) {
     val p = LocalFluent.current
     val context = LocalContext.current
-    var menuOpen by remember { mutableStateOf(false) }
+    val menuShow = remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
 
     if (record == null) {
@@ -138,38 +141,20 @@ fun ReportScreen(
                 Box {
                     AcrylicIconButton(
                         icon = Icons.Rounded.MoreVert,
-                        onClick = { menuOpen = true },
+                        onClick = { menuShow.value = true },
                         contentDescription = "更多"
                     )
-                    DropdownMenu(
-                        expanded = menuOpen,
-                        onDismissRequest = { menuOpen = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("编辑这条记录", fontSize = 13.sp) },
-                            leadingIcon = {
-                                Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                            },
-                            onClick = {
-                                menuOpen = false
+                    ListPopup(show = menuShow, onDismissRequest = { menuShow.value = false }) {
+                        ListPopupColumn {
+                            PopupActionItem("编辑这条记录", Icons.Rounded.Edit) {
+                                menuShow.value = false
                                 onEdit(record.id)
                             }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("删除这条记录", fontSize = 13.sp, color = p.danger) },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Rounded.Delete,
-                                    contentDescription = null,
-                                    tint = p.danger,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            },
-                            onClick = {
-                                menuOpen = false
+                            PopupActionItem("删除这条记录", Icons.Rounded.Delete, danger = true) {
+                                menuShow.value = false
                                 confirmDelete = true
                             }
-                        )
+                        }
                     }
                 }
             }
@@ -273,34 +258,31 @@ fun ReportScreen(
             }
         }
 
-        Spacer(Modifier.height(12.dp))
-
+        GroupLabel("板块拆解")
         Reveal(110) {
-            AcrylicCard(modifier = Modifier.fillMaxWidth()) {
-                SectionTitle(
-                    title = "板块拆解",
-                    subtitle = "各板块正确率与题量"
-                )
-                Spacer(Modifier.height(8.dp))
+            AcrylicCard(
+                modifier = Modifier.fillMaxWidth(),
+                padding = PaddingValues(horizontal = 18.dp, vertical = 8.dp)
+            ) {
                 record.answeredSections.forEachIndexed { index, section ->
+                    if (index > 0) RowDivider()
                     SectionBarRow(
                         section = section,
                         delayMillis = 100 + index * 70,
-                        highlight = section == record.answeredSections.minByOrNull { it.accuracy }
+                        highlight = section == record.answeredSections.minByOrNull { it.accuracy },
+                        modifier = Modifier.padding(vertical = 6.dp)
                     )
                 }
             }
         }
 
         if (lastOverallDelta != null || avgOverallDelta != null) {
-            Spacer(Modifier.height(12.dp))
+            GroupLabel("本次对比 · 较上次 / 较平均")
             Reveal(160) {
-                AcrylicCard(modifier = Modifier.fillMaxWidth()) {
-                    SectionTitle(
-                        title = "本次对比",
-                        subtitle = "相对上一次 / 历史平均"
-                    )
-                    Spacer(Modifier.height(10.dp))
+                AcrylicCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    padding = PaddingValues(horizontal = 18.dp, vertical = 12.dp)
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Spacer(Modifier.weight(1f))
                         Text(
@@ -321,13 +303,7 @@ fun ReportScreen(
                     Spacer(Modifier.height(6.dp))
                     ComparisonRow("总正确率", lastOverallDelta, avgOverallDelta, strong = true)
                     Spacer(Modifier.height(6.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .background(p.divider)
-                    )
-                    Spacer(Modifier.height(6.dp))
+                    RowDivider()
                     record.answeredSections.forEach { section ->
                         val lastSection = previous?.sections
                             ?.firstOrNull { it.name == section.name && it.total > 0 }
@@ -352,14 +328,9 @@ fun ReportScreen(
         }
 
         if (trendShown.size >= 2) {
-            Spacer(Modifier.height(12.dp))
+            GroupLabel("正确率趋势")
             Reveal(200) {
                 AcrylicCard(modifier = Modifier.fillMaxWidth()) {
-                    SectionTitle(
-                        title = "正确率趋势",
-                        subtitle = "最近 ${trendShown.size} 次模考"
-                    )
-                    Spacer(Modifier.height(14.dp))
                     TrendChart(
                         values = trendShown.map { it.accuracy },
                         labels = trendShown.map { Fmt.dateDot(it.dateMillis) },
@@ -369,15 +340,9 @@ fun ReportScreen(
             }
         }
 
-        Spacer(Modifier.height(12.dp))
-
+        GroupLabel("诊断与建议")
         Reveal(260) {
             AcrylicCard(modifier = Modifier.fillMaxWidth()) {
-                SectionTitle(
-                    title = "诊断与建议",
-                    subtitle = "结合本次与历史记录"
-                )
-                Spacer(Modifier.height(6.dp))
                 insights.forEach { InsightRow(it) }
                 Spacer(Modifier.height(8.dp))
                 Box(

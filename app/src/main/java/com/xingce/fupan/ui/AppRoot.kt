@@ -24,6 +24,7 @@ import com.xingce.fupan.data.PaperRecord
 import com.xingce.fupan.data.RecordStore
 import com.xingce.fupan.ui.components.FluentBackground
 import com.xingce.fupan.ui.screens.AddRecordScreen
+import top.yukonga.miuix.kmp.utils.MiuixPopupUtils.Companion.MiuixPopupHost
 import com.xingce.fupan.ui.screens.AnalysisScreen
 import com.xingce.fupan.ui.screens.HistoryScreen
 import com.xingce.fupan.ui.screens.HomeScreen
@@ -138,5 +139,8 @@ fun AppRoot(records: List<PaperRecord>) {
                 )
             }
         }
+
+        // miuix 弹窗宿主：SuperDialog / ListPopup 都由它渲染，必须放在内容之上
+        MiuixPopupHost()
     }
 }

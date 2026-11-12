@@ -27,8 +27,6 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Visibility
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,11 +47,14 @@ import com.xingce.fupan.ui.components.AcrylicCard
 import com.xingce.fupan.ui.components.ConfirmDialog
 import com.xingce.fupan.ui.components.EmptyStateCard
 import com.xingce.fupan.ui.components.PillChip
+import com.xingce.fupan.ui.components.PopupActionItem
 import com.xingce.fupan.ui.components.Reveal
 import com.xingce.fupan.ui.components.ScreenTopBar
 import com.xingce.fupan.ui.components.accuracyColor
 import com.xingce.fupan.ui.theme.LocalFluent
 import com.xingce.fupan.util.Fmt
+import top.yukonga.miuix.kmp.basic.ListPopup
+import top.yukonga.miuix.kmp.basic.ListPopupColumn
 
 @Composable
 fun HistoryScreen(
@@ -230,7 +231,6 @@ private fun RecordCard(
     onDelete: () -> Unit
 ) {
     val p = LocalFluent.current
-    var menuOpen by remember { mutableStateOf(false) }
     val color = accuracyColor(record.accuracy)
 
     AcrylicCard(
@@ -293,11 +293,12 @@ private fun RecordCard(
                 }
             }
             Box {
+                val menuShow = remember { mutableStateOf(false) }
                 Box(
                     modifier = Modifier
                         .size(30.dp)
                         .clip(RoundedCornerShape(50))
-                        .clickable { menuOpen = true },
+                        .clickable { menuShow.value = true },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -307,50 +308,21 @@ private fun RecordCard(
                         modifier = Modifier.size(18.dp)
                     )
                 }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    DropdownMenuItem(
-                        text = { Text("查看报告", fontSize = 13.sp) },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Rounded.Visibility,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        },
-                        onClick = {
-                            menuOpen = false
+                ListPopup(show = menuShow, onDismissRequest = { menuShow.value = false }) {
+                    ListPopupColumn {
+                        PopupActionItem("查看报告", Icons.Rounded.Visibility) {
+                            menuShow.value = false
                             onClick()
                         }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("编辑记录", fontSize = 13.sp) },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Rounded.Edit,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        },
-                        onClick = {
-                            menuOpen = false
+                        PopupActionItem("编辑记录", Icons.Rounded.Edit) {
+                            menuShow.value = false
                             onEdit()
                         }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("删除", fontSize = 13.sp, color = p.danger) },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Rounded.Delete,
-                                contentDescription = null,
-                                tint = p.danger,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        },
-                        onClick = {
-                            menuOpen = false
+                        PopupActionItem("删除", Icons.Rounded.Delete, danger = true) {
+                            menuShow.value = false
                             onDelete()
                         }
-                    )
+                    }
                 }
             }
         }

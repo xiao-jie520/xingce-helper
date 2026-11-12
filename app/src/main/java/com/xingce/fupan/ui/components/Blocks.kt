@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -48,6 +49,12 @@ import com.xingce.fupan.data.Tone
 import com.xingce.fupan.ui.theme.LocalFluent
 import com.xingce.fupan.util.Fmt
 import kotlinx.coroutines.delay
+import top.yukonga.miuix.kmp.basic.Button as MiuixButton
+import top.yukonga.miuix.kmp.basic.ButtonColors
+import top.yukonga.miuix.kmp.basic.ButtonDefaults as MiuixButtonDefaults
+import top.yukonga.miuix.kmp.basic.TopAppBar as MiuixTopAppBar
+import top.yukonga.miuix.kmp.extra.SuperDialog
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** 正确率对应的语义色 */
 @Composable
@@ -270,7 +277,7 @@ fun EmptyStateCard(
     }
 }
 
-/** 二次确认弹窗 */
+/** 二次确认弹窗：miuix SuperDialog */
 @Composable
 fun ConfirmDialog(
     title: String,
@@ -280,40 +287,68 @@ fun ConfirmDialog(
     onDismiss: () -> Unit,
     danger: Boolean = false
 ) {
-    val p = LocalFluent.current
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = if (p.dark) Color(0xFF171D27) else Color.White,
-        shape = RoundedCornerShape(24.dp),
-        title = {
-            Text(
-                text = title,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = p.textPrimary
-            )
+    val cs = MiuixTheme.colorScheme
+    val show = remember { mutableStateOf(true) }
+    SuperDialog(
+        show = show,
+        title = title,
+        summary = message,
+        onDismissRequest = {
+            show.value = false
+            onDismiss()
         },
-        text = {
-            Text(
-                text = message,
-                fontSize = 13.sp,
-                color = p.textSecondary,
-                lineHeight = 19.sp
-            )
-        },
-        confirmButton = {
-            androidx.compose.material3.TextButton(onClick = onConfirm) {
-                Text(
-                    text = confirmText,
-                    color = if (danger) p.danger else p.accent,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.5.sp
+        content = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                MiuixButton(
+                    onClick = {
+                        show.value = false
+                        onDismiss()
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp),
+                    cornerRadius = 18.dp,
+                    minWidth = 0.dp,
+                    insideMargin = PaddingValues(0.dp),
+                    colors = MiuixButtonDefaults.buttonColors(),
+                    content = {
+                        Text(
+                            text = "取消",
+                            color = cs.onSecondaryVariant,
+                            fontSize = 14.sp
+                        )
+                    }
                 )
-            }
-        },
-        dismissButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) {
-                Text(text = "取消", color = p.textSecondary, fontSize = 13.5.sp)
+                MiuixButton(
+                    onClick = {
+                        show.value = false
+                        onConfirm()
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp),
+                    cornerRadius = 18.dp,
+                    minWidth = 0.dp,
+                    insideMargin = PaddingValues(0.dp),
+                    colors = if (danger) {
+                        ButtonColors(color = cs.error, disabledColor = cs.error.copy(alpha = 0.4f))
+                    } else {
+                        MiuixButtonDefaults.buttonColorsPrimary()
+                    },
+                    content = {
+                        Text(
+                            text = confirmText,
+                            color = cs.onPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                )
             }
         }
     )
@@ -326,17 +361,14 @@ fun AboutDialog(
     onDismiss: () -> Unit
 ) {
     val p = LocalFluent.current
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+    val show = remember { mutableStateOf(true) }
+    SuperDialog(
+        show = show,
+        onDismissRequest = onDismiss,
+        content = {
         Column(
             modifier = Modifier
                 .width(300.dp)
-                .clip(RoundedCornerShape(26.dp))
-                .background(Brush.verticalGradient(listOf(p.acrylicStrong, p.acrylic)))
-                .border(
-                    1.dp,
-                    Brush.verticalGradient(listOf(p.strokeTop, p.strokeBottom)),
-                    RoundedCornerShape(26.dp)
-                )
                 .padding(horizontal = 20.dp, vertical = 22.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -418,24 +450,27 @@ fun AboutDialog(
                 fontSize = 9.5.sp
             )
             Spacer(Modifier.height(14.dp))
-            Box(
+            MiuixButton(
+                onClick = onDismiss,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(42.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Brush.horizontalGradient(listOf(p.accent, p.accentLight)))
-                    .clickable { onDismiss() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "知道了",
-                    color = Color.White,
-                    fontSize = 13.5.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
+                    .height(44.dp),
+                cornerRadius = 18.dp,
+                minWidth = 0.dp,
+                insideMargin = PaddingValues(0.dp),
+                colors = MiuixButtonDefaults.buttonColorsPrimary(),
+                content = {
+                    Text(
+                        text = "知道了",
+                        color = MiuixTheme.colorScheme.onPrimary,
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            )
         }
-    }
+        }
+    )
 }
 
 /** 顶部导航条：左图标 + 标题 + 右侧动作 */
@@ -449,32 +484,59 @@ fun ScreenTopBar(
     actions: @Composable (() -> Unit)? = null
 ) {
     val p = LocalFluent.current
+    Column(modifier = modifier.fillMaxWidth()) {
+        MiuixTopAppBar(
+            title = title,
+            color = Color.Transparent,
+            navigationIcon = {
+                AcrylicIconButton(icon = backIcon, onClick = onBack, contentDescription = "返回")
+            },
+            actions = { actions?.invoke() },
+            defaultWindowInsetsPadding = false,
+            horizontalPadding = 20.dp
+        )
+        if (subtitle != null) {
+            Text(
+                text = subtitle,
+                color = p.textTertiary,
+                fontSize = 11.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 20.dp, bottom = 6.dp)
+            )
+        }
+    }
+}
+
+/** miuix ListPopup 的菜单条目 */
+@Composable
+fun PopupActionItem(
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    danger: Boolean = false,
+    onClick: () -> Unit
+) {
+    val cs = MiuixTheme.colorScheme
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AcrylicIconButton(icon = backIcon, onClick = onBack, contentDescription = "返回")
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                color = p.textPrimary,
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.2).sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (danger) cs.error else cs.onSurfaceVariantSummary,
+                modifier = Modifier.size(18.dp)
             )
-            if (subtitle != null) {
-                Text(
-                    text = subtitle,
-                    color = p.textTertiary,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            Spacer(Modifier.width(10.dp))
         }
-        if (actions != null) actions()
+        Text(
+            text = text,
+            color = if (danger) cs.error else cs.onSurface,
+            fontSize = 14.sp
+        )
     }
 }

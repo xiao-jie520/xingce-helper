@@ -45,10 +45,12 @@ import com.xingce.fupan.data.PaperRecord
 import com.xingce.fupan.data.SectionResult
 import com.xingce.fupan.ui.components.AcrylicCard
 import com.xingce.fupan.ui.components.EmptyStateCard
+import com.xingce.fupan.ui.components.GroupLabel
 import com.xingce.fupan.ui.components.InsightRow
 import com.xingce.fupan.ui.components.PillChip
 import com.xingce.fupan.ui.components.ProgressRing
 import com.xingce.fupan.ui.components.Reveal
+import com.xingce.fupan.ui.components.RowDivider
 import com.xingce.fupan.ui.components.ScreenTopBar
 import com.xingce.fupan.ui.components.SectionBarRow
 import com.xingce.fupan.ui.components.SectionTitle
@@ -245,28 +247,26 @@ fun AnalysisScreen(
             return@Column
         }
 
-        Spacer(Modifier.height(12.dp))
-
+        GroupLabel("区间概览")
         Reveal(0) {
             SummaryCard(agg)
         }
 
-        Spacer(Modifier.height(12.dp))
-
+        GroupLabel("各模块平均成绩 · 按题量加权")
         Reveal(70) {
-            AcrylicCard(modifier = Modifier.fillMaxWidth()) {
-                SectionTitle(
-                    title = "各模块平均成绩",
-                    subtitle = "按题量加权 · 由高到低"
-                )
-                Spacer(Modifier.height(8.dp))
+            AcrylicCard(
+                modifier = Modifier.fillMaxWidth(),
+                padding = PaddingValues(horizontal = 18.dp, vertical = 8.dp)
+            ) {
                 agg.sortedModules.forEachIndexed { index, module ->
+                    if (index > 0) RowDivider()
                     SectionBarRow(
                         section = SectionResult(module.name, module.totalQuestions, module.totalCorrect),
                         delayMillis = 100 + index * 70,
                         highlight = index == agg.sortedModules.lastIndex && agg.sortedModules.size > 1,
                         countText = "场均 ${Fmt.num1(module.avgCorrect)}/${Fmt.num0(module.avgTotal)}",
-                        trailingText = "${module.exams} 场"
+                        trailingText = "${module.exams} 场",
+                        modifier = Modifier.padding(vertical = 6.dp)
                     )
                 }
                 Spacer(Modifier.height(6.dp))
@@ -280,14 +280,9 @@ fun AnalysisScreen(
         }
 
         if (chrono.size >= 2) {
-            Spacer(Modifier.height(12.dp))
+            GroupLabel("正确率走势")
             Reveal(140) {
                 AcrylicCard(modifier = Modifier.fillMaxWidth()) {
-                    SectionTitle(
-                        title = "正确率走势",
-                        subtitle = "所选范围内 ${chrono.size} 场"
-                    )
-                    Spacer(Modifier.height(14.dp))
                     TrendChart(
                         values = chrono.map { it.accuracy },
                         labels = chrono.map { Fmt.dateDot(it.dateMillis) },
@@ -297,15 +292,9 @@ fun AnalysisScreen(
             }
         }
 
-        Spacer(Modifier.height(12.dp))
-
+        GroupLabel("诊断与建议")
         Reveal(200) {
             AcrylicCard(modifier = Modifier.fillMaxWidth()) {
-                SectionTitle(
-                    title = "诊断与建议",
-                    subtitle = "基于所选范围的平均表现"
-                )
-                Spacer(Modifier.height(6.dp))
                 insights.forEach { InsightRow(it) }
             }
         }

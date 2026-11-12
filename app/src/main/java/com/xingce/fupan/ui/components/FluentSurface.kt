@@ -1,16 +1,9 @@
 package com.xingce.fupan.ui.components
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -33,13 +26,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -50,8 +49,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xingce.fupan.ui.theme.LocalFluent
+import top.yukonga.miuix.kmp.basic.Button as MiuixButton
+import top.yukonga.miuix.kmp.basic.ButtonDefaults as MiuixButtonDefaults
+import top.yukonga.miuix.kmp.basic.Card as MiuixCard
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-/** 页面背景：竖向渐变 + 两团低频光斑，模拟 Fluent 的亚克力底层 */
+/**
+ * 页面背景：直接使用 miuix 的 background 色，保持与顶栏、卡片同一套底。
+ * 不再叠加光晕——那会在四角留下色块。
+ */
 @Composable
 fun FluentBackground(
     modifier: Modifier = Modifier,
@@ -61,98 +67,74 @@ fun FluentBackground(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .drawBehind {
-                drawRect(Brush.verticalGradient(listOf(p.canvasTop, p.canvasBottom)))
-                val c1 = Offset(size.width * 1.02f, size.height * 0.01f)
-                val r1 = size.width * 1.30f
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(p.glowPrimary, Color.Transparent),
-                        center = c1,
-                        radius = r1
-                    ),
-                    radius = r1,
-                    center = c1
-                )
-                val c2 = Offset(-size.width * 0.08f, size.height * 0.74f)
-                val r2 = size.width * 1.10f
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(p.glowSecondary, Color.Transparent),
-                        center = c2,
-                        radius = r2
-                    ),
-                    radius = r2,
-                    center = c2
-                )
-            }
+            .background(p.canvasTop)
     ) {
         content()
     }
 }
 
+/**
+ * 卡片：直接使用 miuix 的 [MiuixCard]（连续圆角、按压反馈、标准内边距）。
+ * 在 HyperOS 规范里卡片是白色容器，浮在灰色页面底上形成区域划分。
+ */
 @Composable
 fun AcrylicCard(
     modifier: Modifier = Modifier,
-    corner: Dp = 26.dp,
+    corner: Dp = 20.dp,
     padding: PaddingValues = PaddingValues(18.dp),
     strong: Boolean = false,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val p = LocalFluent.current
-    val shape = RoundedCornerShape(corner)
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scaleAnim by animateFloatAsState(
-        targetValue = if (pressed && onClick != null) 0.978f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
-        label = "acrylicScale"
-    )
-
-    var base = modifier
-    base = if (p.dark) {
-        base.shadow(0.dp, shape, false, Color.Transparent, Color.Transparent)
+    if (onClick != null) {
+        MiuixCard(
+            modifier = modifier,
+            cornerRadius = corner,
+            insideMargin = padding,
+            onClick = onClick,
+            content = content
+        )
     } else {
-        base.shadow(
-            elevation = 16.dp,
-            shape = shape,
-            clip = false,
-            ambientColor = p.shadow.copy(alpha = 0.10f),
-            spotColor = p.shadow.copy(alpha = 0.18f)
+        MiuixCard(
+            modifier = modifier,
+            cornerRadius = corner,
+            insideMargin = padding,
+            content = content
         )
     }
+}
 
-    Column(
-        modifier = base
-            .scale(scaleAnim)
-            .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        if (strong) p.acrylicStrong else p.acrylic,
-                        if (strong) p.acrylic else p.acrylicSoft
-                    )
-                )
-            )
-            .border(
-                BorderStroke(1.dp, Brush.verticalGradient(listOf(p.strokeTop, p.strokeBottom))),
-                shape
-            )
-            .then(
-                if (onClick != null) {
-                    Modifier.clickable(
-                        interactionSource = interaction,
-                        indication = LocalIndication.current,
-                        onClick = onClick
-                    )
-                } else Modifier
-            )
-            .padding(padding),
-        content = content
+/** 分组标题：HyperOS 设置风格的小标签，位于卡片上方 */
+@Composable
+fun GroupLabel(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    val cs = MiuixTheme.colorScheme
+    Text(
+        text = text,
+        color = cs.onSurfaceVariantSummary,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Medium,
+        letterSpacing = 0.2.sp,
+        modifier = modifier.padding(start = 4.dp, top = 20.dp, bottom = 8.dp)
     )
 }
 
+/** 卡片内行与行之间的分隔线（左侧留出与文字对齐的缩进） */
+@Composable
+fun RowDivider(modifier: Modifier = Modifier) {
+    val cs = MiuixTheme.colorScheme
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(start = 2.dp)
+            .height(1.dp)
+            .background(cs.dividerLine)
+    )
+}
+
+/** 圆形图标按钮（顶栏右侧动作），保持轻量圆钮形态 */
 @Composable
 fun AcrylicIconButton(
     icon: ImageVector,
@@ -176,10 +158,10 @@ fun AcrylicIconButton(
             .scale(scaleAnim)
             .clip(CircleShape)
             .background(p.acrylicStrong)
-            .border(1.dp, Brush.verticalGradient(listOf(p.strokeTop, p.strokeBottom)), CircleShape)
+            .border(1.dp, p.strokeBottom.copy(alpha = 0.6f), CircleShape)
             .clickable(
                 interactionSource = interaction,
-                indication = LocalIndication.current,
+                indication = androidx.compose.foundation.LocalIndication.current,
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center
@@ -193,6 +175,7 @@ fun AcrylicIconButton(
     }
 }
 
+/** 主按钮：miuix [MiuixButton]（primary 配色 + 连续圆角） */
 @Composable
 fun GradientButton(
     text: String,
@@ -202,70 +185,41 @@ fun GradientButton(
     icon: ImageVector? = null,
     hint: String? = null
 ) {
-    val p = LocalFluent.current
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scaleAnim by animateFloatAsState(
-        targetValue = if (pressed && enabled) 0.962f else 1f,
-        animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
-        label = "btnScale"
-    )
-    val shape = RoundedCornerShape(20.dp)
-    val bg = if (enabled) {
-        Brush.horizontalGradient(listOf(p.accent, p.accentLight))
-    } else {
-        Brush.horizontalGradient(listOf(p.track, p.track))
-    }
-    Box(
-        modifier = modifier
-            .scale(scaleAnim)
-            .then(
-                if (enabled && !p.dark) Modifier.shadow(
-                    elevation = 14.dp,
-                    shape = shape,
-                    clip = false,
-                    ambientColor = p.accent.copy(alpha = 0.35f),
-                    spotColor = p.accent.copy(alpha = 0.45f)
-                ) else Modifier
-            )
-            .height(58.dp)
-            .clip(shape)
-            .background(bg)
-            .clickable(
-                interactionSource = interaction,
-                indication = LocalIndication.current,
-                enabled = enabled,
-                onClick = onClick
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    val cs = MiuixTheme.colorScheme
+    MiuixButton(
+        onClick = onClick,
+        modifier = modifier.height(52.dp),
+        enabled = enabled,
+        cornerRadius = 22.dp,
+        minWidth = 0.dp,
+        insideMargin = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+        colors = MiuixButtonDefaults.buttonColorsPrimary(),
+        content = {
             if (icon != null) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = if (enabled) Color.White else p.textTertiary,
+                    tint = cs.onPrimary,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(Modifier.width(8.dp))
             }
             Text(
                 text = text,
-                color = if (enabled) Color.White else p.textTertiary,
+                color = cs.onPrimary,
                 fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.3.sp
+                fontWeight = FontWeight.SemiBold
             )
             if (hint != null) {
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = hint,
-                    color = if (enabled) Color.White.copy(alpha = 0.68f) else p.textTertiary.copy(alpha = 0.6f),
+                    color = cs.onPrimary.copy(alpha = 0.7f),
                     fontSize = 11.sp
                 )
             }
         }
-    }
+    )
 }
 
 @Composable
@@ -301,6 +255,7 @@ fun SectionTitle(
     }
 }
 
+/** 标签：可点击时用 miuix 按钮（连续圆角 + 标准按压反馈） */
 @Composable
 fun PillChip(
     text: String,
@@ -310,30 +265,43 @@ fun PillChip(
     tint: Color? = null
 ) {
     val p = LocalFluent.current
-    val bg = if (selected) {
-        Brush.horizontalGradient(listOf(p.accent, p.accentLight))
-    } else {
-        Brush.horizontalGradient(listOf(p.acrylicStrong, p.acrylicSoft))
-    }
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(50))
-            .background(bg)
-            .border(
-                1.dp,
-                if (selected) Color.Transparent else p.strokeBottom.copy(alpha = 0.5f),
-                RoundedCornerShape(50)
-            )
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 13.dp, vertical = 6.dp)
-    ) {
-        Text(
-            text = text,
-            color = if (selected) Color.White else (tint ?: p.textSecondary),
-            fontSize = 11.5.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-            textAlign = TextAlign.Center
+    val cs = MiuixTheme.colorScheme
+    if (onClick != null) {
+        MiuixButton(
+            onClick = onClick,
+            modifier = modifier.height(30.dp),
+            cornerRadius = 50.dp,
+            minWidth = 0.dp,
+            insideMargin = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+            colors = if (selected) {
+                MiuixButtonDefaults.buttonColorsPrimary()
+            } else {
+                MiuixButtonDefaults.buttonColors()
+            },
+            content = {
+                Text(
+                    text = text,
+                    color = if (selected) cs.onPrimary else (tint ?: cs.onSecondaryVariant),
+                    fontSize = 11.5.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+                )
+            }
         )
+    } else {
+        Box(
+            modifier = modifier
+                .clip(RoundedCornerShape(50))
+                .background(if (selected) p.accent else p.track)
+                .padding(horizontal = 13.dp, vertical = 6.dp)
+        ) {
+            Text(
+                text = text,
+                color = if (selected) cs.onPrimary else (tint ?: p.textSecondary),
+                fontSize = 11.5.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
@@ -364,8 +332,7 @@ fun SegmentedToggle(
                 .width(itemWidth)
                 .height(42.dp)
                 .clip(RoundedCornerShape(11.dp))
-                .background(Brush.verticalGradient(listOf(p.acrylicStrong, p.acrylic)))
-                .border(1.dp, p.strokeTop.copy(alpha = 0.7f), RoundedCornerShape(11.dp))
+                .background(p.acrylicStrong)
         )
         Row(modifier = Modifier.fillMaxSize()) {
             options.forEachIndexed { index, label ->
